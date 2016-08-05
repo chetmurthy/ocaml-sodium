@@ -41,6 +41,31 @@ OBJOPT=$(OBJ:.cmo=.cmx)
 lib/ocaml-sodium.cma lib/ocaml-sodium.cmxa: lib/sodium_stubs.o $(OBJ) $(OBJOPT)
 	ocamlfind ocamlmklib -verbose -o lib/ocaml-sodium $(OBJ) $(OBJOPT) lib/sodium_stubs.o -lsodium
 
+test:: lib_test/nacl_runner lib_test/test_sodium.byte lib_test/test_sodium.native
+	lib_test/test_sodium.byte
+	lib_test/test_sodium.native
+
+lib_test/nacl_runner: lib_test/nacl_runner.c
+	cc -Wall -g  -o lib_test/nacl_runner lib_test/nacl_runner.c -lsodium
+
+TESTML= \
+  lib_test/test_auth.ml \
+  lib_test/test_box.ml \
+  lib_test/test_generichash.ml \
+  lib_test/test_hash.ml \
+  lib_test/test_random.ml \
+  lib_test/test_scalar_mult.ml \
+  lib_test/test_secret_box.ml \
+  lib_test/test_sign.ml \
+  lib_test/test_stream.ml \
+  lib_test/test_sodium.ml
+
+lib_test/test_sodium.byte: $(TESTOBJ)
+	ocamlfind ocamlc -linkpkg -package ctypes.stubs -package bigarray -package bytes -package sodium -package oUnit -I lib_test $(TESTML) -o lib_test/test_sodium.byte
+
+lib_test/test_sodium.native: $(TESTOBJ)
+	ocamlfind ocamlopt -linkpkg -package ctypes.stubs -package bigarray -package bytes -package sodium -package oUnit -I lib_test $(TESTML) -o lib_test/test_sodium.native
+
 install:
 	ocamlfind install sodium lib/META \
         lib/sodium.mli lib/sodium.cmi lib/sodium.cmti lib/ocaml-sodium.cma lib/ocaml-sodium.cmxa lib/ocaml-sodium.a lib/dllocaml-sodium.so lib/libocaml-sodium.a
