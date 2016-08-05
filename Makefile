@@ -1,40 +1,65 @@
-MAKEFILE_PATH := $(abspath $(lastword $(MAKEFILE_LIST)))
-CURRENT_DIR := $(dir $(MAKEFILE_PATH))
 
-OCAML_LIB_DIR=$(shell ocamlc -where)
-include $(OCAML_LIB_DIR)/Makefile.config
+OCAMLCFLAGS=-c -bin-annot -safe-string -package ctypes.stubs -package bigarray -package bytes -w @5@8@10@11@12@14@23@24@26@29 -I lib_gen -I lib
+OCAMLC=ocamlfind ocamlc
+OCAMLOPT=ocamlfind ocamlopt
 
-CTYPES_LIB_DIR=$(shell ocamlfind query ctypes)
+all: lib/ocaml-sodium.cma lib/ocaml-sodium.cmxa
 
-ENV=CTYPES_LIB_DIR=$(CTYPES_LIB_DIR) OCAML_LIB_DIR=$(OCAML_LIB_DIR)
-OCAMLBUILD=$(ENV) ocamlbuild -use-ocamlfind -classic-display
+lib_gen/sodium_typegen.byte: lib_gen/sodium_types.cmo lib_gen/sodium_typegen.cmo
+	ocamlfind ocamlc -linkpkg -package ctypes.stubs lib_gen/sodium_types.cmo lib_gen/sodium_typegen.cmo -o lib_gen/sodium_typegen.byte
 
-all:
-	$(OCAMLBUILD) lib/sodium.cma lib/sodium.cmxa
+lib_gen/sodium_types_detect.c: lib_gen/sodium_typegen.byte
+	lib_gen/sodium_typegen.byte
 
-clean:
-	$(OCAMLBUILD) -clean
 
-test: _build/lib_test/nacl_runner
-	CAML_LD_LIBRARY_PATH=$(CURRENT_DIR)_build/lib:$(CAML_LD_LIBRARY_PATH) \
-		$(OCAMLBUILD) lib_test/test_sodium.byte --
-	$(OCAMLBUILD) lib_test/test_sodium.native --
+lib_gen/sodium_types_detect: lib_gen/sodium_types_detect.c
+	cc -I /home/chet/Hack/ocaml-4.02.3/.opam/system/lib/ctypes -I /home/chet/Hack/ocaml-4.02.3/lib/ocaml -o lib_gen/sodium_types_detect lib_gen/sodium_types_detect.c
+
+lib/sodium_types_detected.ml: lib_gen/sodium_types_detect
+	lib_gen/sodium_types_detect > lib/sodium_types_detected.ml
+
+lib_gen/sodium_bindgen.byte: lib/sodium_storage.cmo lib/sodium_types_detected.cmo lib_gen/sodium_bindings.cmo lib_gen/sodium_bindgen.cmo
+	ocamlfind ocamlc -linkpkg -package ctypes.stubs lib/sodium_storage.cmo lib/sodium_types_detected.cmo lib_gen/sodium_types.cmo lib_gen/sodium_bindings.cmo lib_gen/sodium_bindgen.cmo -o lib_gen/sodium_bindgen.byte
+
+lib/sodium_stubs.c lib/sodium_generated.ml: lib_gen/sodium_bindgen.byte
+	lib_gen/sodium_bindgen.byte
+
+lib/sodium_stubs.o: lib/sodium_stubs.c
+	ocamlfind ocamlc -ccopt -I/usr/local/include -I /home/chet/Hack/ocaml-4.02.3/.opam/system/lib/ctypes -ccopt '--std=c99 -Wall -pedantic -Werror -Wno-pointer-sign' -c lib/sodium_stubs.c && mv sodium_stubs.o lib/sodium_stubs.o
+
+lib/sodium_bindings.ml: lib_gen/sodium_bindings.ml
+	cp -p lib_gen/sodium_bindings.ml lib/sodium_bindings.ml
+
+lib/sodium_types.ml: lib_gen/sodium_types.ml
+	cp -p lib_gen/sodium_types.ml lib/sodium_types.ml
+
+lib/sodium.cmo: lib/sodium.cmi
+
+OBJ=lib/sodium_storage.cmo lib/sodium_types.cmo lib/sodium_types_detected.cmo lib/sodium_bindings.cmo lib/sodium_generated.cmo lib/sodium.cmo
+OBJOPT=$(OBJ:.cmo=.cmx)
+
+lib/ocaml-sodium.cma lib/ocaml-sodium.cmxa: lib/sodium_stubs.o $(OBJ) $(OBJOPT)
+	ocamlfind ocamlmklib -verbose -o lib/ocaml-sodium $(OBJ) $(OBJOPT) lib/sodium_stubs.o -lsodium
 
 install:
 	ocamlfind install sodium lib/META \
-		$(addprefix _build/lib/,sodium.mli sodium.cmi sodium.cmti \
-					sodium.cma sodium.cmxa \
-		                        sodium$(EXT_LIB) \
-					dllsodium_stubs$(EXT_DLL) \
-					libsodium_stubs$(EXT_LIB))
+        lib/sodium.mli lib/sodium.cmi lib/sodium.cmti lib/ocaml-sodium.cma lib/ocaml-sodium.cmxa lib/ocaml-sodium.a lib/dllocaml-sodium.so lib/libocaml-sodium.a
 
 uninstall:
 	ocamlfind remove sodium
 
-reinstall: uninstall install
+.SUFFIXES: .ml .mli .cmi .cmo .cmx
 
-.PHONY: all clean test install uninstall reinstall
+.ml.cmo:
+	$(OCAMLC) -c $(OCAMLCFLAGS) -o $@ $<
 
-_build/%: %.c
-	mkdir -p $$(dirname $@)
-	$(CC) -Wall -g $(CFLAGS) -lsodium -o $@ $^
+.ml.cmx:
+	$(OCAMLOPT) -c $(OCAMLCFLAGS) -o $@ $<
+
+.mli.cmi:
+	$(OCAMLC) -c $(OCAMLCFLAGS) -o $@ $<
+
+clean:
+	rm -f */*.byte */*.cm* */*.o */*.a */*.so lib_gen/sodium_types_detect* lib/sodium_stubs.c lib/sodium_generated.ml lib/sodium_types_detected.ml lib/sodium_bindings.ml lib/sodium_types.ml
+
+lib/sodium_types_detected.ml: lib/sodium_types_detected.ml
