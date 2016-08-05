@@ -3,3 +3,14 @@ _build/
 *.byte
 setup.log
 setup.data
+*/*.cm*
+*/*.o
+*/*.a
+*?*.so
+lib/sodium_bindings.ml
+lib/sodium_generated.ml
+lib/sodium_stubs.c
+lib/sodium_types.ml
+lib/sodium_types_detected.ml
+lib_gen/sodium_types_detect
+lib_gen/sodium_types_detect.c
