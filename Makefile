@@ -13,7 +13,7 @@ lib_gen/sodium_types_detect.c: lib_gen/sodium_typegen.byte
 
 
 lib_gen/sodium_types_detect: lib_gen/sodium_types_detect.c
-	cc -I /home/chet/Hack/ocaml-4.02.3/.opam/system/lib/ctypes -I /home/chet/Hack/ocaml-4.02.3/lib/ocaml -o lib_gen/sodium_types_detect lib_gen/sodium_types_detect.c
+	cc -I `ocamlfind query ctypes` -I `ocamlc -where` -o lib_gen/sodium_types_detect lib_gen/sodium_types_detect.c
 
 lib/sodium_types_detected.ml: lib_gen/sodium_types_detect
 	lib_gen/sodium_types_detect > lib/sodium_types_detected.ml
@@ -25,7 +25,7 @@ lib/sodium_stubs.c lib/sodium_generated.ml: lib_gen/sodium_bindgen.byte
 	lib_gen/sodium_bindgen.byte
 
 lib/sodium_stubs.o: lib/sodium_stubs.c
-	ocamlfind ocamlc -ccopt -I/usr/local/include -I /home/chet/Hack/ocaml-4.02.3/.opam/system/lib/ctypes -ccopt '--std=c99 -Wall -pedantic -Werror -Wno-pointer-sign' -c lib/sodium_stubs.c && mv sodium_stubs.o lib/sodium_stubs.o
+	ocamlfind ocamlc -ccopt -I/usr/local/include -I `ocamlfind query ctypes` -ccopt '--std=c99 -Wall -pedantic -Werror -Wno-pointer-sign' -c lib/sodium_stubs.c && mv sodium_stubs.o lib/sodium_stubs.o
 
 lib/sodium_bindings.ml: lib_gen/sodium_bindings.ml
 	cp -p lib_gen/sodium_bindings.ml lib/sodium_bindings.ml
